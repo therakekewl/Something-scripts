@@ -14,13 +14,13 @@ F9::
     
     if (isEnabled)
     {
-        ToolTip, PTT Auto-Hold: ON
+        ToolTip("PTT Auto-Hold: ON")
         loop_active := true
         PressF8Loop()
     }
     else
     {
-        ToolTip, PTT Auto-Hold: OFF
+        ToolTip("PTT Auto-Hold: OFF")
         loop_active := false
         KeyUp("F8")  ; Release F8 if it's being held
     }
@@ -49,7 +49,7 @@ F6::
     isEnabled := false
     loop_active := false
     KeyUp("F8")
-    ToolTip, PTT Auto-Hold: STOPPED
+    ToolTip("PTT Auto-Hold: STOPPED")
     SetTimer(() => ToolTip(), 2000)
     return
 }
