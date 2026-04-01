@@ -1,1 +1,344 @@
--- Roblox KutakWare V4 Script with Mobile Support --\n-- Original features ... (Full script with 700+ lines) ...\n-- Mobile touch input handling\nfunction onTouchInput(event)\n    -- Convert mouse clicks to touch events\n    if event.phase == 'began' then\n        -- Handle touch start\n    elseif event.phase == 'moved' then\n        -- Handle touch movement for swipes\n    elseif event.phase == 'ended' then\n        -- Handle touch end\n    end\nend\n\nfunction detectSwipe(event)\n    -- Implement swipe gesture detection for menu navigation\n    if(event.direction == "left") then\n        -- Swipe left to change tabs\n    elseif(event.direction == "right") then\n        -- Swipe right to change tabs\n    elseif(event.direction == "up") then\n        -- Swipe up to scroll\n    elseif(event.direction == "down") then\n        -- Swipe down to scroll\n    end\nend\n\n-- Additional mobile-specific functionality ...\n-- Ensure that every feature is integrated into the UI and functionality as expected.
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local GuiService = game:GetService("GuiService")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
+
+-- Detect if on mobile
+local IsMobile = UIS.TouchEnabled and not UIS.MouseEnabled
+
+local function Round(parent, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 8)
+    corner.Parent = parent
+    return corner
+end
+
+if PlayerGui:FindFirstChild("KutakWare_V4_Final") then PlayerGui.KutakWare_V4_Final:Destroy() end
+local ScreenGui = Instance.new("ScreenGui", PlayerGui); ScreenGui.Name = "KutakWare_V4_Final"; ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true 
+
+local ESPContainer = Instance.new("Folder", ScreenGui); ESPContainer.Name = "ESP_Objects"
+
+local MenuKey = Enum.KeyCode.K
+local Binding = false
+local MenuVisible = true
+
+local function MakeDraggable(gui, dragPart)
+    local dragging, dragInput, dragStart, startPos
+    dragPart.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = gui.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    dragPart.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+    UIS.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+local function StartScript()
+    local Config = {
+        ESP = false, ESPNames = false, ESPHealth = false, ESPDistance = false,
+        ESPCrates = false, ESPSafes = false, ESPScrap = false,
+        Aimlock = false, WallCheck = true, AimPart = "Head", 
+        Smoothness = 0.15, AimFOV = 150, Prediction = 0.165,
+        FullBright = false, BGColor = Color3.fromRGB(120, 0, 255),
+        ESPGradient = false,
+        ESPColor = Color3.fromRGB(255, 255, 255)
+    }
+
+    local BG = Instance.new("Frame", ScreenGui); BG.Name = "BackgroundGradient"; BG.Size = UDim2.new(1, 0, 1, 100); BG.Position = UDim2.new(0, 0, 0, -50); BG.BorderSizePixel = 0; BG.ZIndex = 0; BG.BackgroundTransparency = 1
+    local Gradient = Instance.new("UIGradient", BG); Gradient.Rotation = 90
+    local function UpdateGradient() Gradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Config.BGColor), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}) end
+    UpdateGradient()
+
+    local CornerImage = Instance.new("ImageLabel", ScreenGui); CornerImage.Name = "KutakCornerImage"; CornerImage.Size = UDim2.new(0, 180, 0, 180); CornerImage.Position = UDim2.new(0, 30, 1, -30); CornerImage.AnchorPoint = Vector2.new(0, 1); CornerImage.BackgroundTransparency = 1; CornerImage.Image = "rbxassetid://121788270887233"; CornerImage.ImageTransparency = 1; CornerImage.ZIndex = 1
+    local CustomDecal = Instance.new("ImageLabel", ScreenGui); CustomDecal.Name = "KutakBottomLeftDecal"; CustomDecal.Size = UDim2.new(0, 150, 0, 150); CustomDecal.Position = UDim2.new(0, 20, 1, -20); CustomDecal.AnchorPoint = Vector2.new(0, 1); CustomDecal.BackgroundTransparency = 1; CustomDecal.Image = "rbxassetid://870690802"; CustomDecal.ImageTransparency = 1; CustomDecal.ZIndex = 1
+
+    local MainFrame = Instance.new("Frame", ScreenGui); MainFrame.Size = UDim2.new(0, IsMobile and 300 or 560, 0, IsMobile and 400 or 620); MainFrame.Position = UDim2.new(0.5, IsMobile and -150 or -280, 0.2, 0); MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10); MainFrame.BorderSizePixel = 0; MainFrame.ZIndex = 2; Round(MainFrame, 12)
+
+    local function ToggleUI(state)
+        MenuVisible = state
+        if state then
+            BG.Visible = true; CornerImage.Visible = not IsMobile; CustomDecal.Visible = not IsMobile; MainFrame.Visible = true
+            TweenService:Create(BG, TweenInfo.new(0.5), {BackgroundTransparency = 0.3}):Play()
+            if not IsMobile then TweenService:Create(CornerImage, TweenInfo.new(0.5), {ImageTransparency = 0}):Play() end
+            if not IsMobile then TweenService:Create(CustomDecal, TweenInfo.new(0.5), {ImageTransparency = 0}):Play() end
+            TweenService:Create(MainFrame, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+        else
+            TweenService:Create(BG, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+            if not IsMobile then TweenService:Create(CornerImage, TweenInfo.new(0.5), {ImageTransparency = 1}):Play() end
+            if not IsMobile then TweenService:Create(CustomDecal, TweenInfo.new(0.5), {ImageTransparency = 1}):Play() end
+            local t = TweenService:Create(MainFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1})
+            t:Play(); t.Completed:Connect(function() if not MenuVisible then BG.Visible = false; if not IsMobile then CornerImage.Visible = false; CustomDecal.Visible = false end; MainFrame.Visible = false end end)
+        end
+    end
+
+    local TabBar = Instance.new("Frame", MainFrame); TabBar.Size = UDim2.new(1, 0, 0, 50); TabBar.BackgroundColor3 = Color3.fromRGB(15, 15, 15); TabBar.BorderSizePixel = 0; TabBar.ZIndex = 3; Round(TabBar, 12); MakeDraggable(MainFrame, TabBar)
+    local LogoLabel = Instance.new("TextLabel", TabBar); LogoLabel.Size = UDim2.new(0, 140, 1, 0); LogoLabel.Position = UDim2.new(0, 10, 0, 0); LogoLabel.BackgroundTransparency = 1; LogoLabel.Text = IsMobile and "KW" or "KutakWare"; LogoLabel.TextColor3 = Color3.new(1, 1, 1); LogoLabel.Font = Enum.Font.RobotoMono; LogoLabel.TextSize = IsMobile and 16 or 22; LogoLabel.TextXAlignment = Enum.TextXAlignment.Left; LogoLabel.ZIndex = 4
+    local StrokeLogo = Instance.new("UIStroke", LogoLabel); StrokeLogo.Thickness = 0.5; StrokeLogo.Color = Color3.new(1, 1, 1); StrokeLogo.Transparency = 0.7
+    local Content = Instance.new("Frame", MainFrame); Content.Size = UDim2.new(1, -20, 1, -65); Content.Position = UDim2.new(0, 10, 0, 60); Content.BackgroundTransparency = 1; Content.ZIndex = 3
+
+    local Tabs = {}
+    local function animateTab(name)
+        for n, t in pairs(Tabs) do
+            local act = (n == name); t.F.Visible = act
+            TweenService:Create(t.B, TweenInfo.new(0.3), {TextColor3 = act and Color3.new(1,1,1) or Color3.fromRGB(120,120,120), BackgroundColor3 = act and Color3.fromRGB(30,30,30) or Color3.fromRGB(20,20,20)}):Play()
+        end
+    end
+
+    local function createTab(name, x)
+        local b = Instance.new("TextButton", TabBar); b.Size = UDim2.new(0, IsMobile and 50 or 85, 0.6, 0); b.Position = UDim2.new(0, x, 0.2, 0); b.Text = IsMobile and name:sub(1,1) or name:lower(); b.Font = Enum.Font.RobotoMono; b.TextSize = IsMobile and 14 or 18; b.BackgroundColor3 = Color3.fromRGB(20,20,20); b.TextColor3 = Color3.fromRGB(120,120,120); b.BorderSizePixel = 0; b.ZIndex = 4; Round(b, 6)
+        local f = Instance.new("ScrollingFrame", Content); f.Size = UDim2.new(1,0,1,0); f.BackgroundTransparency = 1; f.Visible = false; f.ScrollBarThickness = 0; f.CanvasSize = UDim2.new(0,0,0, 650); f.ZIndex = 4
+        Tabs[name] = {B = b, F = f}
+        b.MouseButton1Click:Connect(function() animateTab(name) end)
+    end
+
+    local function createToggle(txt, parent, key, pos, cb)
+        local b = Instance.new("TextButton", parent); b.Size = UDim2.new(0, IsMobile and 130 or 240, 0, 40); b.Position = pos; b.BackgroundColor3 = Color3.fromRGB(25,25,25); b.Font = Enum.Font.RobotoMono; b.TextSize = IsMobile and 12 or 17; b.BorderSizePixel = 0; b.ZIndex = 5; Round(b, 8)
+        if key == "AimPart" then b.Text = "target: head" else b.Text = txt:lower() .. ": OFF" end
+        b.TextColor3 = Color3.fromRGB(160,160,160)
+        b.MouseButton1Click:Connect(function()
+            if key == "AimPart" then
+                Config.AimPart = (Config.AimPart == "Head" and "HumanoidRootPart" or "Head")
+                b.Text = "target: " .. (Config.AimPart == "Head" and "head" or "torso")
+            else
+                Config[key] = not Config[key]
+                if cb then cb(Config[key], b) end
+                b.Text = txt:lower() .. ": " .. (Config[key] and "ON" or "OFF")
+                b.TextColor3 = Config[key] and Color3.new(1,1,1) or Color3.fromRGB(160,160,160)
+                b.BackgroundColor3 = Config[key] and Color3.fromRGB(40,40,40) or Color3.fromRGB(25,25,25)
+            end
+        end)
+    end
+
+    local function createSlider(txt, parent, min, max, def, key, pos, div)
+        local f = Instance.new("Frame", parent); f.Size = UDim2.new(0, IsMobile and 140 or 260, 0, 60); f.Position = pos; f.BackgroundColor3 = Color3.fromRGB(15,15,15); f.BorderSizePixel = 0; f.ZIndex = 5; Round(f, 8)
+        local l = Instance.new("TextLabel", f); l.Size = UDim2.new(1,0,0,25); l.Text = txt:lower() .. ": " .. def; l.TextColor3 = Color3.new(1,1,1); l.Font = Enum.Font.RobotoMono; l.TextSize = IsMobile and 12 or 16; l.BackgroundTransparency = 1; l.ZIndex = 6
+        local bar = Instance.new("Frame", f); bar.Size = UDim2.new(0.85, 0, 0, 4); bar.Position = UDim2.new(0.075, 0, 0.7, 0); bar.BackgroundColor3 = Color3.fromRGB(45,45,45); bar.BorderSizePixel = 0; bar.ZIndex = 6; Round(bar, 2)
+        local dot = Instance.new("Frame", bar); dot.Size = UDim2.new(0, 12, 0, 12); dot.Position = UDim2.new((def-min)/(max-min), -6, 0.5, -6); dot.BackgroundColor3 = Color3.new(1,1,1); dot.BorderSizePixel = 0; dot.ZIndex = 7; Round(dot, 12)
+        local active = false
+        f.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then active = true end end)
+        UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then active = false end end)
+        RunService.RenderStepped:Connect(function()
+            if active then
+                local x = math.clamp((Mouse.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+                dot.Position = UDim2.new(x, -6, 0.5, -6)
+                local val = min + (x * (max - min))
+                Config[key] = div and val/div or val
+                l.Text = txt:lower() .. ": " .. (div and string.format("%.2f", Config[key]) or math.floor(val))
+            end
+        end)
+    end
+
+    if IsMobile then
+        createTab("A", 15); createTab("E", 70); createTab("M", 125)
+    else
+        createTab("Aim", 170); createTab("ESP", 265); createTab("Misc", 360); createTab("?", 455)
+    end
+
+    createToggle("target", Tabs[IsMobile and "A" or "Aim"].F, "AimPart", UDim2.new(0, 5, 0, 10))
+    createToggle("aimlock", Tabs[IsMobile and "A" or "Aim"].F, "Aimlock", UDim2.new(0, 5, 0, 60))
+    createToggle("wall check", Tabs[IsMobile and "A" or "Aim"].F, "WallCheck", UDim2.new(0, 5, 0, 110))
+    createSlider("aim fov", Tabs[IsMobile and "A" or "Aim"].F, 10, 600, 150, "AimFOV", UDim2.new(0, IsMobile and 5 or 275, 0, 10))
+    createSlider("smoothness", Tabs[IsMobile and "A" or "Aim"].F, 1, 100, 15, "Smoothness", UDim2.new(0, IsMobile and 5 or 275, 0, 95), 100)
+    createSlider("prediction", Tabs[IsMobile and "A" or "Aim"].F, 0, 500, 165, "Prediction", UDim2.new(0, IsMobile and 5 or 275, 0, 180), 1000)
+
+    createToggle("player esp", Tabs[IsMobile and "E" or "ESP"].F, "ESP", UDim2.new(0, 5, 0, 10))
+    createToggle("box gradient", Tabs[IsMobile and "E" or "ESP"].F, "ESPGradient", UDim2.new(0, 5, 0, 60))
+    
+    local ESP_CP = Instance.new("TextButton", Tabs[IsMobile and "E" or "ESP"].F); ESP_CP.Size = UDim2.new(0, IsMobile and 130 or 240, 0, 40); ESP_CP.Position = UDim2.new(0, 5, 0, 110); ESP_CP.BackgroundColor3 = Config.ESPColor; ESP_CP.Text = "color"; ESP_CP.Font = Enum.Font.RobotoMono; ESP_CP.TextColor3 = Color3.new(0,0,0); ESP_CP.TextSize = IsMobile and 12 or 17; ESP_CP.ZIndex = 5; Round(ESP_CP, 8)
+    local espColors = {Color3.fromRGB(255,255,255), Color3.fromRGB(120,0,255), Color3.fromRGB(255,0,0), Color3.fromRGB(0,255,0), Color3.fromRGB(0,120,255), Color3.fromRGB(255,255,0)}
+    local espCIdx = 1
+    ESP_CP.MouseButton1Click:Connect(function()
+        espCIdx = espCIdx + 1; if espCIdx > #espColors then espCIdx = 1 end
+        Config.ESPColor = espColors[espCIdx]; ESP_CP.BackgroundColor3 = Config.ESPColor
+    end)
+
+    createToggle("health bar", Tabs[IsMobile and "E" or "ESP"].F, "ESPHealth", UDim2.new(0, IsMobile and 5 or 275, 0, 10))
+    createToggle("show names", Tabs[IsMobile and "E" or "ESP"].F, "ESPNames", UDim2.new(0, IsMobile and 5 or 275, 0, 60))
+    createToggle("distance", Tabs[IsMobile and "E" or "ESP"].F, "ESPDistance", UDim2.new(0, IsMobile and 5 or 275, 0, 110))
+    createToggle("crate esp", Tabs[IsMobile and "E" or "ESP"].F, "ESPCrates", UDim2.new(0, 5, 0, 160))
+    createToggle("safe esp", Tabs[IsMobile and "E" or "ESP"].F, "ESPSafes", UDim2.new(0, 5, 0, 210))
+    createToggle("scrap esp", Tabs[IsMobile and "E" or "ESP"].F, "ESPScrap", UDim2.new(0, 5, 0, 260))
+
+    local OrigLight = {Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime, GlobalShadows = Lighting.GlobalShadows, Ambient = Lighting.Ambient, OutdoorAmbient = Lighting.OutdoorAmbient}
+
+    createToggle("fullbright", Tabs[IsMobile and "M" or "Misc"].F, "FullBright", UDim2.new(0, 5, 0, 10), function(val)
+        if not val then Lighting.Brightness = OrigLight.Brightness; Lighting.ClockTime = OrigLight.ClockTime; Lighting.GlobalShadows = OrigLight.GlobalShadows; Lighting.Ambient = OrigLight.Ambient; Lighting.OutdoorAmbient = OrigLight.OutdoorAmbient end
+    end)
+    
+    if not IsMobile then
+        local Bnd = Instance.new("TextButton", Tabs.Misc.F); Bnd.Size = UDim2.new(0, 240, 0, 50); Bnd.Position = UDim2.new(0, 5, 0, 70); Bnd.BackgroundColor3 = Color3.fromRGB(25, 25, 25); Bnd.Text = "keybind: K"; Bnd.Font = Enum.Font.RobotoMono; Bnd.TextColor3 = Color3.new(1, 1, 1); Bnd.TextSize = 17; Bnd.BorderSizePixel = 0; Bnd.ZIndex = 5; Round(Bnd, 8)
+        Bnd.MouseButton1Click:Connect(function() Binding = true; Bnd.Text = "..." end)
+    end
+
+    local CP = Instance.new("TextButton", Tabs[IsMobile and "M" or "Misc"].F); CP.Size = UDim2.new(0, IsMobile and 130 or 240, 0, 40); CP.Position = UDim2.new(0, 5, 0, IsMobile and 60 or 130); CP.BackgroundColor3 = Config.BGColor; CP.Text = "bg color"; CP.Font = Enum.Font.RobotoMono; CP.TextColor3 = Color3.new(1, 1, 1); CP.TextSize = IsMobile and 12 or 17; CP.BorderSizePixel = 0; CP.ZIndex = 5; Round(CP, 8)
+    local colors = {Color3.fromRGB(120, 0, 255), Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 120, 255), Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 255, 255)}
+    local cIdx = 1
+    CP.MouseButton1Click:Connect(function()
+        cIdx = cIdx + 1; if cIdx > #colors then cIdx = 1 end
+        Config.BGColor = colors[cIdx]; CP.BackgroundColor3 = Config.BGColor; UpdateGradient()
+    end)
+
+    local function AddESP(p)
+        local Box = Drawing.new("Square"); Box.Visible = false; Box.Thickness = 1; Box.Color = Color3.new(1,1,1)
+        local Health = Drawing.new("Line"); Health.Visible = false; Health.Thickness = 2; Health.Color = Color3.new(0,1,0)
+        local Name = Drawing.new("Text"); Name.Visible = false; Name.Size = 16; Name.Center = true; Name.Outline = true; Name.Color = Color3.new(1,1,1)
+        local GBox = Instance.new("Frame", ESPContainer); GBox.BackgroundTransparency = 1; GBox.BorderSizePixel = 0; GBox.Visible = false; GBox.AnchorPoint = Vector2.new(0.5, 0.5)
+        local GStroke = Instance.new("UIStroke", GBox); GStroke.Thickness = 1; GStroke.Color = Color3.new(1,1,1)
+        local GGrad = Instance.new("UIGradient", GBox); GGrad.Rotation = 90; GGrad.Enabled = false
+
+        local connection; connection = RunService.RenderStepped:Connect(function()
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p ~= LocalPlayer then
+                if Config.ESP then
+                    local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+                    if onScreen then
+                        local sizeX, sizeY = 2000 / pos.Z, 3000 / pos.Z
+                        local topLeft = Vector2.new(pos.X - sizeX/2, pos.Y - sizeY/2)
+
+                        if Config.ESPGradient then
+                            Box.Visible = false
+                            GBox.Visible = true
+                            GBox.Size = UDim2.new(0, sizeX, 0, sizeY)
+                            GBox.Position = UDim2.new(0, pos.X, 0, pos.Y) 
+                            GBox.BackgroundTransparency = 0.6
+                            GGrad.Enabled = true
+                            GGrad.Color = ColorSequence.new(Config.ESPColor, Color3.new(0,0,0))
+                            GStroke.Color = Config.ESPColor
+                        else
+                            GBox.Visible = false
+                            Box.Visible = true; Box.Size = Vector2.new(sizeX, sizeY); Box.Position = topLeft; Box.Color = Color3.new(1,1,1)
+                        end
+
+                        if Config.ESPHealth and p.Character:FindFirstChild("Humanoid") then
+                            Health.Visible = true; Health.From = Vector2.new(topLeft.X - 5, topLeft.Y + sizeY); Health.To = Vector2.new(topLeft.X - 5, topLeft.Y + sizeY - (sizeY * (p.Character.Humanoid.Health / 100)))
+                        else Health.Visible = false end
+
+                        if Config.ESPNames then
+                            Name.Visible = true; Name.Position = Vector2.new(pos.X, topLeft.Y - 20)
+                            Name.Text = p.Name .. (Config.ESPDistance and " ["..math.floor(pos.Z).."]" or "")
+                        else Name.Visible = false end
+                        return
+                    end
+                end
+            end
+            Box.Visible = false; GBox.Visible = false; Health.Visible = false; Name.Visible = false
+            if not p.Parent then Box:Remove(); Health:Remove(); Name:Remove(); GBox:Destroy(); connection:Disconnect() end
+        end)
+    end
+
+    for _,v in pairs(Players:GetPlayers()) do AddESP(v) end Players.PlayerAdded:Connect(AddESP)
+
+    local function CreateHighlight(obj, color)
+        local hl = obj:FindFirstChild("KutakHighlight")
+        if not hl then hl = Instance.new("Highlight"); hl.Name = "KutakHighlight"; hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent = obj end
+        hl.FillColor = color; hl.OutlineColor = Color3.new(1, 1, 1); hl.FillAlpha = 0.5; hl.OutlineAlpha = 0; return hl
+    end
+
+    local function AddLootESP(obj, type)
+        task.spawn(function()
+            while obj and obj.Parent do
+                local active = (type == "Crate" and Config.ESPCrates) or (type == "Safe" and Config.ESPSafes) or (type == "Scrap" and Config.ESPScrap)
+                local hl = obj:FindFirstChild("KutakHighlight")
+                if active then
+                    local targetColor = Color3.fromRGB(255, 255, 255)
+                    if type == "Scrap" then targetColor = Color3.fromRGB(255, 0, 0)
+                    elseif type == "Safe" then
+                        local vls = obj:FindFirstChild("Values"); local brk = vls and vls:FindFirstChild("Broken")
+                        targetColor = (brk and (tostring(brk.Value) == "1" or brk.Value == true)) and Color3.fromRGB(255,0,0) or Color3.fromRGB(0,255,0)
+                    elseif type == "Crate" then
+                        local msh = obj:IsA("MeshPart") and obj or obj:FindFirstChildWhichIsA("MeshPart", true)
+                        targetColor = (msh and string.find(tostring(msh.TextureID), "11157915894")) and Color3.fromRGB(255,0,0) or Color3.fromRGB(0,255,0)
+                    end
+                    if not hl then hl = CreateHighlight(obj, targetColor) end
+                    hl.Enabled = true; hl.FillColor = targetColor
+                else if hl then hl.Enabled = false end end
+                task.wait(0.5)
+            end
+        end)
+    end
+
+    local function scanLoot(v)
+        local n = v.Name
+        if n == "S1" or n == "S2" then AddLootESP(v, "Scrap")
+        elseif n == "SmallSafe" or n == "MediumSafe" then AddLootESP(v, "Safe")
+        elseif n == "C1" then AddLootESP(v, "Crate") end
+    end
+    for _, v in pairs(workspace:GetDescendants()) do task.spawn(scanLoot, v) end
+    workspace.DescendantAdded:Connect(function(v) task.spawn(scanLoot, v) end)
+
+    local FOV = Drawing.new("Circle"); FOV.Visible = false; FOV.Color = Color3.new(1,1,1); FOV.Thickness = 1
+    local LockedTarget = nil
+    RunService.RenderStepped:Connect(function()
+        FOV.Visible = Config.Aimlock; FOV.Radius = Config.AimFOV; FOV.Position = Vector2.new(Mouse.X, Mouse.Y + GuiService:GetGuiInset().Y)
+        if Config.FullBright then Lighting.Brightness = 2; Lighting.ClockTime = 14; Lighting.Ambient = Color3.new(1,1,1); Lighting.OutdoorAmbient = Color3.new(1,1,1); Lighting.GlobalShadows = false end
+        if Config.Aimlock and (UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or IsMobile) then
+            if not LockedTarget then
+                local minD = Config.AimFOV
+                for _, v in pairs(Players:GetPlayers()) do
+                    if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild(Config.AimPart) then
+                        local part = v.Character[Config.AimPart]
+                        local sPos, onS = Camera:WorldToViewportPoint(part.Position)
+                        if onS then
+                            local mDist = (Vector2.new(sPos.X, sPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                            if mDist < minD then
+                                local vis = true
+                                if Config.WallCheck then
+                                    local params = RaycastParams.new(); params.FilterType = Enum.RaycastFilterType.Exclude; params.FilterDescendantsInstances = {LocalPlayer.Character, v.Character}
+                                    local res = workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * (part.Position - Camera.CFrame.Position).Magnitude, params)
+                                    if res then vis = false end
+                                end
+                                if vis then minD = mDist; LockedTarget = part end
+                            end
+                        end
+                    end
+                end
+            end
+            if LockedTarget then Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, LockedTarget.Position + (LockedTarget.Velocity * Config.Prediction)), Config.Smoothness) end
+        else LockedTarget = nil end
+    end)
+
+    UIS.InputBegan:Connect(function(i, g)
+        if not IsMobile then
+            if Binding and i.UserInputType == Enum.UserInputType.Keyboard then MenuKey = i.KeyCode; Binding = false; if Tabs.Misc and Tabs.Misc.F:FindFirstChild("Bnd") then Tabs.Misc.F.Bnd.Text = "keybind: " .. MenuKey.Name end
+            elseif not g and i.KeyCode == MenuKey then MenuVisible = not MenuVisible; ToggleUI(MenuVisible) end
+        end
+    end)
+
+    if IsMobile then
+        local touchStartX, touchStartY
+        UIS.TouchBegan:Connect(function(touch, gpe)
+            if not gpe then touchStartX, touchStartY = touch.Position.X, touch.Position.Y end
+        end)
+        UIS.TouchEnded:Connect(function(touch, gpe)
+            if not gpe and touchStartX and touchStartY then
+                local deltaX = touch.Position.X - touchStartX
+                local deltaY = touch.Position.Y - touchStartY
+                if math.abs(deltaX) > 50 then
+                    local currentTab = next(Tabs)
+                    local tabOrder = IsMobile and {"A", "E", "M"} or {"Aim", "ESP", "Misc", "?"}
+                    local currentIdx = 1
+                    for i, t in ipairs(tabOrder) do if Tabs[t].F.Visible then currentIdx = i break end end
+                    if deltaX > 0 and currentIdx > 1 then animateTab(tabOrder[currentIdx-1])
+                    elseif deltaX < 0 and currentIdx < #tabOrder then animateTab(tabOrder[currentIdx+1]) end
+                end
+            end
+        end)
+    end
+
+    ToggleUI(true); animateTab(IsMobile and "A" or "Aim")
+end
+
+StartScript()
